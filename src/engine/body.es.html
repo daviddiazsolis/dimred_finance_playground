@@ -1,0 +1,344 @@
+<div class="wrap">
+<script type="application/json" id="pasos-json">{
+"idea": ["Dos variables", "Proyectar y reconstruir", "La matemática", "Los comandos"],
+"fra": ["Los datos", "Varianza explicada", "Las cargas", "¿Cuántas componentes?", "El umbral", "¿Por qué funciona?"],
+"fut": ["Partir por tiempo", "La contaminación", "Contra los supervisados"],
+"cur": ["La curva", "Preparar los datos", "Las tres formas", "¿Qué tan bueno?", "Escenarios", "Chile y EEUU"],
+"ae": ["La arquitectura", "Lineal es PCA", "No lineal", "La tabla final"],
+"map": ["El código en 2D", "Ruido puro"],
+"pre": ["Preguntas de repaso", "Ejercicios de los notebooks"]
+}</script>
+<nav class="tabs" id="tabs" aria-label="Temas">
+  <button type="button" data-m="idea"><span>01</span>La idea del PCA</button>
+  <button type="button" data-m="fra"><span>02</span>Fraude con PCA</button>
+  <button type="button" data-m="fut"><span>03</span>La prueba del futuro</button>
+  <button type="button" data-m="cur"><span>04</span>La curva de tasas</button>
+  <button type="button" data-m="ae"><span>05</span>Autoencoders</button>
+  <button type="button" data-m="map"><span>06</span>t-SNE y UMAP</button>
+  <button type="button" data-m="pre"><span>07</span>Preguntas y ejercicios</button>
+</nav>
+
+<!-- ===================== 01 LA IDEA ===================== -->
+<div class="modelo" id="m-idea">
+<div class="controls">
+  <div class="ctrl" data-pasos="0,1"><label for="idea-rho">Correlación monto y puntos: <b id="idea-rho-v">0,90</b></label><input type="range" id="idea-rho" min="50" max="98" value="90" style="width:200px"></div>
+  <div class="ctrl" data-pasos="1"><label for="idea-bv">Desajuste de B (fuera de la línea): <b id="idea-bv-v">1,20</b></label><input type="range" id="idea-bv" min="-250" max="250" value="120" style="width:200px"></div>
+  <div class="ctrl" data-pasos="1"><label for="idea-bu">Posición de B (a lo largo): <b id="idea-bu-v">0,00</b></label><input type="range" id="idea-bu" min="-250" max="250" value="0" style="width:200px"></div>
+</div>
+<nav class="rail" id="idea-rail"></nav>
+
+<section class="panel" id="idea-s0">
+  <h2>Un programa de puntos y 400 compras normales</h2>
+  <p>Antes de las 29 columnas de una base real, un dibujo con dos. Por cada compra, la tarjeta acumula puntos más o menos proporcionales al monto. Cada punto gris es una compra normal, con monto y puntos estandarizados (promedio 0, desviación 1). Mueve la correlación: con una relación fuerte, las compras normales viven casi sobre una línea.</p>
+  <p>Esa línea verde es la <b>primera componente principal</b>: la dirección en que los datos varían más. El análisis de componentes principales (PCA; Pearson, 1901; Hotelling, 1933) la encuentra sin que nadie le diga que monto y puntos van juntos. La segunda componente es la perpendicular, y con una correlación de 0,9 explica apenas un 5% de la variación.</p>
+  <div class="flow"><div id="idea-plot0"></div><div id="idea-kpi0" style="flex:1;min-width:220px"></div></div>
+</section>
+
+<section class="panel" id="idea-s1">
+  <h2>Proyectar, reconstruir y medir el error</h2>
+  <p>Si guardamos solo la primera componente, cada compra se resume en <b>un número</b>: su posición a lo largo de la línea (su <b>puntaje</b>). Desde ese número se puede <b>reconstruir</b> la compra: es el punto de la línea más cercano (el círculo vacío). La distancia al cuadrado entre la compra y su reconstrucción, la línea punteada, es el <b>error de reconstrucción</b>.</p>
+  <p><b style="color:var(--q)">A</b> es una compra enorme, con los puntos que le corresponden: es extrema, pero calza con el patrón, y su error es casi cero. <b style="color:var(--bad)">B</b> es una compra con monto y puntos moderados, pero que no calza: tiene más puntos de los que corresponden a su monto. Mueve B con los controles y mira cómo cambia su error frente al percentil 99 del error de las compras normales.</p>
+  <div class="flow"><div id="idea-plot1"></div><div style="flex:1;min-width:220px"><div id="idea-kpi1"></div><p class="note" id="idea-nota1"></p></div></div>
+  <p>Esa es la idea completa del detector de fraude de este módulo: <b>no busca transacciones grandes, busca transacciones que rompen las relaciones que cumplen las normales</b>. En fraude eso es justo lo que se necesita, porque muchas veces cada dato por separado se ve inocente.</p>
+</section>
+
+<section class="panel" id="idea-s2">
+  <h2>La matemática mínima</h2>
+  <p>Con \(p\) variables estandarizadas, el PCA busca los vectores propios de la matriz de covarianzas \(S\):</p>
+  <div class="eq"><span class="name">Descomposición en valores y vectores propios</span>\[ S\, w_j = \lambda_j\, w_j, \qquad \lambda_1 \ge \lambda_2 \ge \dots \ge \lambda_p \]</div>
+  <p>\(w_j\) es la dirección \(j\), un vector de largo 1 cuyos elementos son las <b>cargas</b> (<i>loadings</i>): cuánto pesa cada variable en esa dirección. \(\lambda_j\) es la varianza de los datos a lo largo de \(w_j\), y la <b>varianza explicada</b> es \(\lambda_j / \sum_i \lambda_i\). Guardando las \(k\) primeras direcciones (las columnas de \(W_k\)), una observación \(x\) se resume y se reconstruye así:</p>
+  <div class="eq"><span class="name">Puntajes y reconstrucción</span>\[ z = W_k^{\top}(x - \mu), \qquad \hat{x} = \mu + W_k\, z \]</div>
+  <p>\(z\) son los \(k\) <b>puntajes</b> y \(\hat{x}\) la <b>reconstrucción</b>. El error de reconstrucción (el estadístico \(Q\) o SPE de Jackson y Mudholkar, 1979) es</p>
+  <div class="eq"><span class="name">Error de reconstrucción</span>\[ e(x) = \lVert x - \hat{x} \rVert^2 = \sum_{j=k+1}^{p} z_j^2 \]</div>
+  <p>La última igualdad es la clave de todo el módulo: el error es la suma de los puntajes al cuadrado en las componentes que <b>descartamos</b>. Una transacción tiene error grande si se mueve mucho en direcciones donde las normales casi no se mueven. En el dibujo de la pestaña, con la correlación que elegiste:</p>
+  <div id="idea-num2"></div>
+</section>
+
+<section class="panel" id="idea-s3">
+  <h2>Los comandos de scikit-learn</h2>
+  <p>Todo lo anterior son cinco atributos y tres métodos de la clase <code>PCA</code>. Los notebooks los usan uno por uno:</p>
+  <div class="mwrap"><table class="tabla">
+    <tr><th>Comando</th><th>Qué entrega</th><th>Forma</th></tr>
+    <tr><td><code>pca = PCA(n_components=k).fit(X)</code></td><td>Estima promedios, direcciones y varianzas con los datos de training. <code>n_components</code> puede ser un entero, un porcentaje de varianza (<code>0.95</code>) o nada (todas).</td><td></td></tr>
+    <tr><td><code>pca.explained_variance_ratio_</code></td><td>Varianza explicada por cada componente, \(\lambda_j / \sum_i \lambda_i\).</td><td>\(k\)</td></tr>
+    <tr><td><code>pca.explained_variance_</code></td><td>Los valores propios \(\lambda_j\).</td><td>\(k\)</td></tr>
+    <tr><td><code>pca.components_</code></td><td>Las cargas: la fila \(j\) es \(w_j\).</td><td>\(k \times p\)</td></tr>
+    <tr><td><code>pca.mean_</code></td><td>El vector de promedios \(\mu\).</td><td>\(p\)</td></tr>
+    <tr><td><code>pca.transform(X)</code></td><td>Los puntajes \(z\) de cada fila.</td><td>\(n \times k\)</td></tr>
+    <tr><td><code>pca.inverse_transform(Z)</code></td><td>La reconstrucción \(\hat{x}\), de vuelta en las \(p\) variables (estandarizadas).</td><td>\(n \times p\)</td></tr>
+    <tr><td><code>escalador.inverse_transform(...)</code></td><td>Deshace la estandarización: vuelve a las unidades originales (euros, puntos base).</td><td>\(n \times p\)</td></tr>
+  </table></div>
+  <p class="note">Antes del PCA casi siempre hay que estandarizar: si una variable está en euros y otra en unidades cercanas a 1, la primera domina la primera componente solo por la escala. En la base de fraude, sin estandarizar, la componente 1 "explica" el 99,95% de la varianza y es puro monto.</p>
+</section>
+<div class="nav"><button type="button" id="idea-prev">Anterior</button><button type="button" id="idea-next">Siguiente</button></div>
+</div>
+
+<!-- ===================== 02 FRAUDE CON PCA ===================== -->
+<div class="modelo" id="m-fra">
+<div class="controls">
+  <div class="ctrl" data-pasos="2"><label>Componente</label><div class="seg" id="fra-cp"><button type="button" data-cp="CP1" aria-pressed="false">CP1</button><button type="button" data-cp="CP28" aria-pressed="true">CP28</button><button type="button" data-cp="CP29" aria-pressed="false">CP29</button></div></div>
+  <div class="ctrl" data-pasos="3"><label for="fra-k">Componentes guardadas k: <b id="fra-k-v">27</b></label><input type="range" id="fra-k" min="1" max="28" value="27" style="width:240px"></div>
+  <div class="ctrl" data-pasos="4"><label for="fra-q">Percentil del error en training: <b id="fra-q-v">99,8</b></label><input type="range" id="fra-q" min="0" max="4" value="2" style="width:200px"></div>
+</div>
+<nav class="rail" id="fra-rail"></nav>
+
+<section class="panel" id="fra-s0">
+  <h2>284.807 transacciones, 492 fraudes, y la etiqueta llega tarde</h2>
+  <p>La base <b>Credit Card Fraud Detection</b> (Dal Pozzolo y otros, 2015) tiene todas las transacciones con tarjeta de un emisor europeo durante dos días de 2013. El fraude es el 0,17%: un modelo que dice que nada es fraude acierta el 99,83% de las veces, así que se mide con <b>PR-AUC</b> (área bajo la curva precision-recall) y con <b>precision@100</b>: de las 100 transacciones más sospechosas, cuántas son fraude.</p>
+  <p>En fraude, la etiqueta llega cuando el cliente reclama, días o semanas después, y el fraude nuevo no tiene etiqueta. Por eso se usa <b>detección de anomalías</b>: aprender cómo es lo normal y marcar lo que no calza. El detector de este módulo es el PCA de la pestaña 01: se ajusta con training sin mirar la etiqueta, y el error de reconstrucción es el puntaje de sospecha.</p>
+  <div id="fra-kpi0"></div>
+  <p class="note">Por confidencialidad, el emisor entregó 28 columnas <code>V1</code> a <code>V28</code> que ya son componentes principales de las variables originales; solo <code>Time</code> y <code>Amount</code> vienen en su escala. Usamos <code>V1</code> a <code>V28</code> y <code>Amount</code> (29 columnas) y dejamos fuera <code>Time</code>, que es un reloj y no una característica. Partición al azar estratificada, 67% y 33%.</p>
+</section>
+
+<section class="panel" id="fra-s1">
+  <h2>Varianza explicada: aquí no hay pocas componentes que lo expliquen todo</h2>
+  <p>En los libros, dos o tres componentes explican casi todo. Aquí cada una explica entre 3% y 4%, salvo la primera (7%) y la última (0,14%), y para llegar al 95% hacen falta <b>27 de 29</b>. La razón: <code>V1</code> a <code>V28</code> ya son componentes principales, no están correlacionadas, y al estandarizarlas cada una aporta lo mismo. El PCA solo encuentra estructura en la relación de <code>Amount</code> con algunas <code>V</code>.</p>
+  <p>Para un detector de anomalías esto está bien. No buscamos resumir en pocas columnas: buscamos las <b>pocas direcciones donde lo normal casi no se mueve</b>, que son las últimas.</p>
+  <div id="fra-plot1"></div>
+</section>
+
+<section class="panel" id="fra-s2">
+  <h2>Las cargas: qué es cada componente</h2>
+  <p><code>components_</code> tiene una fila por componente y una columna por variable. Compara las tres:</p>
+  <ul>
+    <li><b>CP1</b>: carga 0,71 en el monto y cargas de signo contrario en <code>V2</code> y <code>V5</code>: es la dirección "monto", con las <code>V</code> que lo acompañan en una compra normal.</li>
+    <li><b>CP29</b>: las mismas variables con los signos al revés. Es "un monto que no corresponde a sus <code>V</code>", el análogo de la componente 2 del dibujo de los puntos.</li>
+    <li><b>CP28</b>: cargas positivas en <code>V17</code>, <code>V12</code>, <code>V14</code>, <code>V10</code>, <code>V16</code> y <code>V7</code>. Guarda esta lista: es la que hace casi todo el trabajo.</li>
+  </ul>
+  <div id="fra-plot2"></div><p class="note" id="fra-cap2"></p>
+</section>
+
+<section class="panel" id="fra-s3">
+  <h2>¿Cuántas componentes guardar?</h2>
+  <p>Con <code>PCA(n_components=0.95)</code> scikit-learn elige el menor \(k\) que llega al 95% de la varianza, sin mirar ninguna etiqueta: aquí, \(k = 27\). El error queda formado por las dos componentes descartadas, la CP28 y la CP29. Mueve \(k\) y mira la PR-AUC en testing (esto sí usa las etiquetas, así que es un diagnóstico que en la práctica no podríamos hacer).</p>
+  <div id="fra-kpi3"></div>
+  <div id="fra-plot3"></div>
+  <p class="note">Con \(k = 28\) el detector se cae a casi nada: la CP28 queda guardada y el fraude se reconstruye bien. La regla del 95% cae en el mejor valor, en parte por suerte. Con detectores de anomalías hay que mirar <b>qué componentes se descartan</b>, no solo cuánta varianza se guarda.</p>
+</section>
+
+<section class="panel" id="fra-s4">
+  <h2>El umbral, sin etiquetas</h2>
+  <p>Para alertar hace falta un umbral, y sin etiquetas no se puede buscar el que maximiza el recall. Lo que sí se sabe es cuántas alertas se pueden revisar. La regla: alertar lo que supere un <b>percentil alto del error en training</b>; con el percentil 99,8 se alerta alrededor del 0,2% de las transacciones, una tasa parecida a la del fraude. Mueve el percentil:</p>
+  <div id="fra-kpi4"></div>
+  <div id="fra-plot4"></div>
+  <p class="note">Las dos distribuciones están muy separadas, pero la cola derecha de las normales llega tan lejos como los fraudes: un detector de anomalías encuentra lo <b>raro</b>, y no todo lo raro es fraude. Y casi uno de cada cinco fraudes tiene un error tan bajo como el de una compra normal: ningún umbral los va a encontrar con este puntaje.</p>
+</section>
+
+<section class="panel" id="fra-s5">
+  <h2>¿Por qué funciona? Una pista de cómo se anonimizaron los datos</h2>
+  <p>Casi toda la detección la hace la CP28, la dirección de <code>V17</code>, <code>V12</code>, <code>V14</code>, <code>V10</code>: justo las variables donde los fraudes toman valores muy negativos a la vez. ¿Por qué el PCA la mandó al final de la lista? Compara las correlaciones entre esas variables en todas las transacciones y solo en las normales:</p>
+  <div class="flow"><div><div class="block"><div class="t">Todas las transacciones</div><div id="fra-t5a"></div></div></div><div><div class="block"><div class="t">Solo las normales</div><div id="fra-t5b"></div></div></div></div>
+  <p>En la base completa la correlación es exactamente cero: las <code>V</code> son componentes principales calculadas por el emisor con todas las transacciones, <b>fraudes incluidos</b>. Entre las normales aparecen correlaciones negativas, que los fraudes (todos extremos en la misma dirección) compensan. Resultado: en las normales esa combinación varía menos de lo que debería, el PCA la descarta, y al descartarla la convierte en el detector.</p>
+  <p class="note">Lección doble: el PCA encuentra sola la dirección donde lo normal no se mueve; pero parte de esa dirección viene de cómo se anonimizó esta base. Con datos sin anonimizar el resultado sería más modesto. Siempre hay que preguntarse <b>por qué</b> funciona un detector, no solo <b>cuánto</b>.</p>
+</section>
+<div class="nav"><button type="button" id="fra-prev">Anterior</button><button type="button" id="fra-next">Siguiente</button></div>
+</div>
+
+<!-- ===================== 03 LA PRUEBA DEL FUTURO ===================== -->
+<div class="modelo" id="m-fut">
+<div class="controls">
+  <div class="ctrl" data-pasos="2"><label>Partición</label><div class="seg" id="fut-part"><button type="button" data-p="azar" aria-pressed="false">al azar</button><button type="button" data-p="tiempo" aria-pressed="true">por tiempo</button></div></div>
+</div>
+<nav class="rail" id="fut-rail"></nav>
+
+<section class="panel" id="fut-s0">
+  <h2>Aprender del pasado, detectar en el futuro</h2>
+  <p>Un detector real se entrena con las transacciones de ayer y se usa con las de mañana. La base trae <code>Time</code>, así que se puede hacer la prueba honesta: el primer 70% del tiempo es training y el último 30% es testing. Mismo método, misma regla del 95%:</p>
+  <div id="fut-kpi0"></div>
+  <p>El detector <b>se desploma</b>: una PR-AUC igual a la del azar y ni un fraude entre las 100 alertas. No cambió el algoritmo, solo cómo separamos el tiempo.</p>
+</section>
+
+<section class="panel" id="fut-s1">
+  <h2>La contaminación: el PCA aprendió el fraude como algo normal</h2>
+  <p>Buscamos, entre las 29 componentes, la que más separa fraudes de normales en training (la "dirección del fraude") y miramos en qué lugar de la lista la puso el PCA. Si el PCA se ajusta con <b>todo training</b>:</p>
+  <div id="fut-p1a"></div><p class="note" id="fut-c1a"></p>
+  <p>Los fraudes del primer día son pocos (el 0,19% de las filas) pero tan extremos en esa dirección que el PCA la ve como mucha variación y la pone entre las primeras, entre las que <b>guarda</b>. Al reconstruir bien el fraude, deja de verlo. Si en cambio el PCA se ajusta <b>solo con transacciones normales</b> (por ejemplo, las de hace más de 60 días sin reclamos):</p>
+  <div id="fut-p1b"></div><p class="note" id="fut-c1b"></p>
+  <div id="fut-kpi1"></div>
+  <p>Se llama <b>contaminación</b> del entrenamiento y es el talón de Aquiles de cualquier detector de anomalías. Entrenar con lo que creemos normal se llama detección de novedades (<i>novelty detection</i>).</p>
+</section>
+
+<section class="panel" id="fut-s2">
+  <h2>¿Cuánto se pierde por no usar etiquetas?</h2>
+  <p>La comparación con los supervisados de los notebooks de clasificación, con las mismas columnas y particiones: una logística, un gradient boosting regularizado y una logística que solo conoce 20 fraudes. Cambia la partición:</p>
+  <div id="fut-t2"></div>
+  <div id="fut-b2" style="margin-top:14px"></div>
+  <ul>
+    <li><b>Con todas las etiquetas gana el supervisado</b>, sobre todo el gradient boosting.</li>
+    <li><b>En el futuro la distancia se achica</b>: en precision@100 el PCA limpio le gana a la logística con todas las etiquetas.</li>
+    <li><b>Con pocas etiquetas, depende</b>: la logística con 20 fraudes empata con el PCA al azar, pero en el futuro queda por debajo. Pocas etiquetas generalizan mal hacia un fraude que cambia.</li>
+    <li><b>El PCA contaminado es el único que se desploma</b>: su problema no es el algoritmo sino lo que le dijimos que era normal.</li>
+  </ul>
+</section>
+<div class="nav"><button type="button" id="fut-prev">Anterior</button><button type="button" id="fut-next">Siguiente</button></div>
+</div>
+
+<!-- ===================== 04 CURVA DE TASAS ===================== -->
+<div class="modelo" id="m-cur">
+<div class="controls">
+  <div class="ctrl" data-pasos="0"><label for="cur-i">Semana: <b id="cur-i-v"></b></label><input type="range" id="cur-i" min="0" max="659" value="659" style="width:300px"></div>
+  <div class="ctrl" data-pasos="2,5"><label>Forma</label><div class="seg" id="cur-f"><button type="button" data-f="0" aria-pressed="true">nivel</button><button type="button" data-f="1" aria-pressed="false">pendiente</button><button type="button" data-f="2" aria-pressed="false">curvatura</button></div></div>
+  <div class="ctrl" data-pasos="3"><label for="cur-k">Factores k: <b id="cur-k-v">3</b></label><input type="range" id="cur-k" min="1" max="5" value="3" style="width:160px"></div>
+  <div class="ctrl" data-pasos="4"><label for="cur-sn">Shock de nivel: <b id="cur-sn-v">0,0</b> desv.</label><input type="range" id="cur-sn" min="-30" max="30" value="0" style="width:150px"></div>
+  <div class="ctrl" data-pasos="4"><label for="cur-sp">Shock de pendiente: <b id="cur-sp-v">0,0</b> desv.</label><input type="range" id="cur-sp" min="-30" max="30" value="0" style="width:150px"></div>
+  <div class="ctrl" data-pasos="4"><label for="cur-sc">Shock de curvatura: <b id="cur-sc-v">0,0</b> desv.</label><input type="range" id="cur-sc" min="-30" max="30" value="0" style="width:150px"></div>
+  <div class="ctrl" data-pasos="4"><label>&nbsp;</label><button type="button" id="cur-reset">Volver a cero</button></div>
+</div>
+<nav class="rail" id="cur-rail"></nav>
+
+<section class="panel" id="cur-s0">
+  <h2>Cinco tasas que se mueven juntas</h2>
+  <p>Los bonos BCU y BTU pagan en UF, así que su tasa es una <b>tasa real</b>. El Banco Central publica cada día la tasa de un bono representativo a 2, 5, 10, 20 y 30 años: la <b>curva de tasas</b>. Una AFP, una aseguradora o la tesorería de un banco tienen bonos en todos esos plazos, y el valor de su cartera depende de cinco tasas a la vez. Mueve la semana (2008 a 2021) y mira cómo cambia la curva: sube y baja entera, se empina y se aplana, se arquea. En 2020 los plazos cortos llegaron a tasas reales negativas.</p>
+  <div id="cur-plot0"></div>
+  <p class="note">Litterman y Scheinkman (1991) mostraron que la curva se mueve casi siempre de tres maneras: <b>nivel</b>, <b>pendiente</b> y <b>curvatura</b>. El PCA las encuentra sin que se las digamos.</p>
+</section>
+
+<section class="panel" id="cur-s1">
+  <h2>Preparar los datos: huecos, frecuencia, niveles o cambios</h2>
+  <p><b>Los huecos.</b> Cada plazo es la tasa del bono más cercano a ese plazo, y hay días y años sin bono de referencia. Porcentaje de días con dato, por plazo (filas, en años) y año (columnas):</p>
+  <div id="cur-t1"></div>
+  <p>Tres decisiones: ventana <b>2008 a 2021</b>, donde existen los cinco plazos; frecuencia <b>semanal</b> (la última tasa de cada semana), que completa semanas sin inventar datos; y <b>nunca</b> rellenar hacia atrás (<code>bfill</code>), que copia un valor futuro en el pasado y deja una tasa plana que nunca existió.</p>
+  <p><b>Niveles o cambios.</b> Sobre los niveles, la primera componente parece explicarlo casi todo. Pero un PCA sobre los niveles de cinco paseos aleatorios <b>independientes</b> también encuentra una "componente dominante": las series con tendencia se parecen por casualidad, la versión PCA de la regresión espuria de Granger y Newbold (1974). Por eso se trabaja con <b>cambios semanales en puntos base</b>.</p>
+  <div id="cur-kpi1"></div>
+  <p><b>Estandarizar.</b> El plazo de 2 años se mueve 20 puntos base por semana y los largos 10. Sin estandarizar, la primera componente sería casi "el plazo de 2 años"; estandarizada, es un nivel limpio.</p>
+</section>
+
+<section class="panel" id="cur-s2">
+  <h2>Las tres formas, encontradas por el PCA</h2>
+  <p>Cada semana, el movimiento de la curva es una mezcla de tres formas fijas (las cargas \(w_1, w_2, w_3\)) y lo que cambia es cuánto hubo de cada una (los factores \(f_{j,t}\)):</p>
+  <div class="eq"><span class="name">Modelo de tres factores</span>\[ x_t \approx f_{1,t}\, w_1 + f_{2,t}\, w_2 + f_{3,t}\, w_3 \]</div>
+  <div id="cur-plot2"></div>
+  <p><b>Nivel</b> (70%): cargas parecidas y del mismo signo, toda la curva junta. <b>Pendiente</b> (16%): negativa en el corto, positiva en el largo; cuando sube, la curva se empina. <b>Curvatura</b> (8%): el tramo de 5 a 10 años contra los extremos. Juntas, el 94% de los movimientos semanales. Los nombres se verifican: el factor de nivel tiene correlación 0,98 con el promedio de los cambios, el de pendiente 0,96 con el spread 30 menos 2 años, y el de curvatura 0,87 con la mariposa.</p>
+  <p>El factor elegido, acumulado semana a semana (el signo de una componente es una convención):</p>
+  <div id="cur-plot2b"></div>
+</section>
+
+<section class="panel" id="cur-s3">
+  <h2>¿Qué tan bueno es? Error en puntos base, dentro y fuera de muestra</h2>
+  <p>El error se mide en las unidades del negocio: si describo cada semana con \(k\) factores y reconstruyo las cinco tasas (con <code>inverse_transform</code> del PCA y del escalador), ¿por cuántos puntos base me equivoco? Fuera de muestra, las formas se estiman con 2008 a 2014 y se usan en 2015 a 2021, que incluye el estallido y la pandemia.</p>
+  <div id="cur-kpi3"></div>
+  <div id="cur-b3"></div>
+  <p class="note">Con solo el nivel, el plazo de 2 años queda casi sin explicar; la pendiente lo arregla. Con tres factores el error es de pocos puntos base por semana, y fuera de muestra apenas sube: las formas de 2008 a 2014 y las de 2015 a 2021 tienen correlaciones de 0,96, 0,96 y 0,91.</p>
+</section>
+
+<section class="panel" id="cur-s4">
+  <h2>Escenarios de estrés con las formas de la historia</h2>
+  <p>Un shock de una desviación estándar del factor \(j\) mueve la curva en \(\sqrt{\lambda_j}\,w_j\) (en unidades estandarizadas); multiplicando por la desviación de cada plazo se vuelve a puntos base. Así se construyen escenarios realistas en vez de inventar movimientos. Combina los tres shocks sobre la última curva de la muestra:</p>
+  <div id="cur-plot4"></div>
+  <div id="cur-t4"></div>
+</section>
+
+<section class="panel" id="cur-s5">
+  <h2>Chile contra Estados Unidos</h2>
+  <p>El mismo proceso con la curva del Tesoro de Estados Unidos (semanal, cambios estandarizados, 2008 a 2021, plazos de 2 a 30 años). Elige la forma y compara:</p>
+  <div id="cur-plot5"></div>
+  <div id="cur-t5"></div>
+  <p class="note">Las formas son casi las mismas: es una regularidad de las curvas, no un accidente chileno. Lo que cambia es cuánto explican. La curva chilena tiene más movimiento propio de cada plazo, sobre todo en 2 años, que en Chile es el plazo más volátil y en Estados Unidos el menos. Dos hipótesis razonables: un mercado menos profundo (benchmarks que cambian o transan poco) y el efecto de la inflación de corto plazo en los bonos cortos en UF.</p>
+</section>
+<div class="nav"><button type="button" id="cur-prev">Anterior</button><button type="button" id="cur-next">Siguiente</button></div>
+</div>
+
+<!-- ===================== 05 AUTOENCODERS ===================== -->
+<div class="modelo" id="m-ae">
+<div class="controls"></div>
+<nav class="rail" id="ae-rail"></nav>
+
+<section class="panel" id="ae-s0">
+  <h2>Una red que se entrena para devolver lo que recibe</h2>
+  <p>Un <b>autoencoder</b> (Hinton y Salakhutdinov, 2006) es una red neuronal con una tarea en apariencia absurda: reproducir su propia entrada. El truco es el <b>cuello de botella</b> del medio, que obliga a comprimir la información.</p>
+  <div id="ae-plot0"></div>
+  <div class="eq"><span class="name">Codificar, decodificar y medir el error</span>\[ h = f(x), \qquad \hat{x} = g(h), \qquad \text{pérdida} = \frac{1}{n}\sum_{i=1}^{n}\lVert x_i - \hat{x}_i \rVert^2 \]</div>
+  <p>\(f\) es el <b>codificador</b>, \(h\) el <b>código</b> (<i>embedding</i>) de 26 números y \(g\) el <b>decodificador</b>. Cada capa densa calcula \(\sigma(A\,u + b)\); con la activación <b>ReLU</b>, \(\sigma(t) = \max(0, t)\), la red puede doblar el espacio y seguir superficies curvas que el PCA no puede. El puntaje de fraude es el mismo error de reconstrucción del PCA. Mismo escenario honesto de la pestaña 03: partición por tiempo y entrenamiento solo con normales.</p>
+</section>
+
+<section class="panel" id="ae-s1">
+  <h2>Un autoencoder lineal es un PCA</h2>
+  <p>Baldi y Hornik (1989) demostraron que un autoencoder sin activaciones, entrenado con error cuadrático, reconstruye exactamente igual que el PCA con el mismo número de componentes. En Keras son cuatro líneas: <code>Input(29)</code>, <code>Dense(26)</code>, <code>Dense(29)</code>, <code>compile(loss="mse")</code>, y se entrena con <code>fit(X, X)</code>: la misma matriz como entrada y como respuesta. El resultado en los datos:</p>
+  <div id="ae-t1"></div>
+  <p class="note">Prácticamente el mismo detector. La diferencia es de procedimiento: el PCA encuentra la solución exacta con álgebra en un instante; la red la busca con gradiente en varias épocas y llega cerca. La novedad de un autoencoder está en las activaciones no lineales.</p>
+</section>
+
+<section class="panel" id="ae-s2">
+  <h2>No lineal: reconstruye mejor, no detecta mejor</h2>
+  <p>La versión con una capa oculta de 64 neuronas ReLU a cada lado del código, entrenada con tres semillas (los pesos iniciales son aleatorios):</p>
+  <div id="ae-kpi2"></div>
+  <div id="ae-b2" style="margin-top:12px"></div>
+  <p>El autoencoder no lineal reconstruye mejor las transacciones normales y ordena algo mejor el conjunto (su AUC ROC es más alto), pero donde importa, en la PR-AUC y en las primeras alertas, depende de la semilla y en promedio queda bajo el PCA. El detector no necesita reconstruir bien <b>todo</b>: necesita reconstruir bien lo normal y <b>mal el fraude</b>. Una red más flexible también aprende a reconstruir combinaciones que no vio, y el contraste se achica.</p>
+  <p class="note">Es la lección de siempre con otro disfraz: más complejidad no es más información. En esta base el patrón que separa al fraude es casi lineal, y el modelo lineal lo captura de forma más estable.</p>
+</section>
+
+<section class="panel" id="ae-s3">
+  <h2>La tabla final</h2>
+  <p>Todos los modelos en la partición por tiempo (testing: el último 30% de las transacciones), incluidos los supervisados con todas las etiquetas:</p>
+  <div id="ae-t3"></div>
+</section>
+<div class="nav"><button type="button" id="ae-prev">Anterior</button><button type="button" id="ae-next">Siguiente</button></div>
+</div>
+
+<!-- ===================== 06 t-SNE y UMAP ===================== -->
+<div class="modelo" id="m-map">
+<div class="controls">
+  <div class="ctrl" data-pasos="0"><label>Método</label><div class="seg" id="map-m"><button type="button" data-m="x" aria-pressed="false">PCA a 2D</button><button type="button" data-m="x2" aria-pressed="true">t-SNE</button><button type="button" data-m="x3" aria-pressed="false">UMAP</button></div></div>
+  <div class="ctrl" data-pasos="1"><label>Método</label><div class="seg" id="map-r"><button type="button" data-r="x" aria-pressed="false">PCA a 2D</button><button type="button" data-r="x2" aria-pressed="true">t-SNE, perplexity 5</button><button type="button" data-r="x3" aria-pressed="false">t-SNE, perplexity 50</button></div></div>
+</div>
+<nav class="rail" id="map-rail"></nav>
+
+<section class="panel" id="map-s0">
+  <h2>Mirar adentro del código del autoencoder</h2>
+  <p>El codificador comprime cada transacción en 26 números. Para verlos hay que bajar a 2 dimensiones. El <b>PCA a 2D</b> es lineal y conserva la varianza; <b>t-SNE</b> (van der Maaten y Hinton, 2008) busca un dibujo donde los vecinos cercanos sigan siendo vecinos; <b>UMAP</b> (McInnes, Healy y Melville, 2018) hace lo mismo con otra matemática, más rápido, y puede aplicar el mapa a datos nuevos. Muestra: 1.500 transacciones normales y los 108 fraudes de testing.</p>
+  <div id="map-plot0"></div>
+  <p class="note">En el PCA a 2D los fraudes salen como una cola desde la nube. t-SNE y UMAP abren la nube y muestran grupos propios de fraudes, y otra parte de los fraudes mezclada con las normales: los que ningún detector de reconstrucción va a encontrar.</p>
+</section>
+
+<section class="panel" id="map-s1">
+  <h2>Lo que no se puede concluir de un t-SNE</h2>
+  <p>Estos son 3.000 puntos de <b>ruido gaussiano puro</b> en 26 dimensiones: no hay ningún grupo. Mira lo que dibuja cada método:</p>
+  <div id="map-plot1"></div>
+  <ul>
+    <li>Las <b>distancias entre grupos</b> y los <b>tamaños de los grupos</b> de un t-SNE no significan nada.</li>
+    <li>Los parámetros (la <i>perplexity</i>, la semilla) <b>cambian el dibujo</b>.</li>
+    <li>t-SNE puede <b>inventar estructura</b> donde no hay ninguna. Un grupo en t-SNE o UMAP es una hipótesis; se confirma con otra cosa.</li>
+  </ul>
+</section>
+<div class="nav"><button type="button" id="map-prev">Anterior</button><button type="button" id="map-next">Siguiente</button></div>
+</div>
+
+<!-- ===================== 07 PREGUNTAS ===================== -->
+<div class="modelo" id="m-pre">
+<div class="controls"></div>
+<nav class="rail" id="pre-rail"></nav>
+
+<section class="panel" id="pre-s0">
+  <h2>Preguntas de repaso</h2>
+  <p>Intenta responder antes de abrir cada respuesta.</p>
+  <details class="block"><summary><b>1.</b> Una transacción tiene el monto más alto de toda la base y aun así su error de reconstrucción es casi cero. ¿Cómo es posible?</summary><p>El error mide cuánto se aparta la transacción de las direcciones que el PCA guardó, no qué tan grande es. Si el monto alto viene acompañado de las demás variables como en una compra normal (como el punto A de la pestaña 01), la transacción cae sobre el subespacio de lo normal y se reconstruye bien.</p></details>
+  <details class="block"><summary><b>2.</b> ¿Por qué el error de reconstrucción es igual a la suma de los puntajes al cuadrado de las componentes descartadas?</summary><p>Porque las direcciones del PCA son perpendiculares entre sí y tienen largo 1. Una observación centrada se escribe exactamente como la suma de sus puntajes por sus direcciones; al reconstruir con \(k\) direcciones, lo que falta es la parte en las direcciones \(k+1\) a \(p\), y su largo al cuadrado es la suma de esos puntajes al cuadrado (Pitágoras en \(p\) dimensiones).</p></details>
+  <details class="block"><summary><b>3.</b> En la base de fraude, ¿por qué la regla del 95% guarda 27 de 29 componentes, cuando en los libros bastan dos o tres?</summary><p>Porque las variables <code>V1</code> a <code>V28</code> ya son componentes principales: no están correlacionadas, y estandarizadas aportan la misma varianza cada una. Solo la relación del monto con algunas <code>V</code> da estructura. Sin correlaciones no hay nada que resumir.</p></details>
+  <details class="block"><summary><b>4.</b> El PCA ajustado con todo training funcionó con la partición al azar y fracasó con la partición por tiempo. ¿Qué cambió?</summary><p>En el training por tiempo, los fraudes del primer día eran tan extremos en la dirección del fraude que el PCA la puso como la componente 2 y la guardó: aprendió el fraude como parte de lo normal. Es la contaminación del entrenamiento. Se arregla ajustando solo con transacciones que se creen normales.</p></details>
+  <details class="block"><summary><b>5.</b> ¿Por qué no conviene aplicar el PCA a los niveles de las tasas?</summary><p>Porque los niveles tienen tendencias largas (no son estacionarios), y series con tendencia parecen correlacionadas aunque no tengan relación: el PCA sobre niveles de cinco paseos aleatorios independientes encuentra una componente que explica más de la mitad de la varianza. Con cambios, esa ilusión desaparece.</p></details>
+  <details class="block"><summary><b>6.</b> En la curva UF, ¿por qué conviene estandarizar los cambios aunque todos estén en puntos base?</summary><p>Porque el plazo de 2 años es el doble de volátil que los largos y, sin estandarizar, se adueña de la primera componente: el "nivel" sería casi el plazo de 2 años. Estandarizada, la primera componente es un nivel limpio y las formas son estables entre períodos. La elección depende de qué plazos importan para quien usa el modelo.</p></details>
+  <details class="block"><summary><b>7.</b> ¿Qué tiene de especial un autoencoder sin activaciones?</summary><p>Que es un PCA: con pérdida cuadrática, su mejor solución reconstruye igual que el PCA con el mismo número de componentes (Baldi y Hornik, 1989). Para que el autoencoder agregue algo hacen falta activaciones no lineales.</p></details>
+  <details class="block"><summary><b>8.</b> El autoencoder no lineal reconstruye mejor que el PCA. ¿Por qué no detecta mejor?</summary><p>Porque detectar exige reconstruir bien lo normal y mal lo anómalo. Una red más flexible también aprende a reconstruir combinaciones raras, incluido parte del fraude, y el contraste entre normales y fraudes se achica. Además su resultado depende de la semilla.</p></details>
+  <details class="block"><summary><b>9.</b> Un t-SNE de los clientes de un banco muestra cinco grupos bien separados. ¿Qué se puede concluir?</summary><p>Nada todavía. t-SNE puede dibujar grupos en datos sin estructura, y las distancias y tamaños de sus grupos no significan nada. Los grupos son una hipótesis: hay que confirmarlos con otra herramienta (un clustering sobre los datos originales, una variable externa, otra muestra).</p></details>
+  <details class="block"><summary><b>10.</b> Si tienes etiquetas de fraude abundantes y confiables, ¿para qué sirve un detector no supervisado?</summary><p>Para el fraude que todavía no tiene etiquetas (un ataque nuevo), para los primeros días de un sistema y como red de seguridad: en el futuro, el supervisado entrenado con pocas etiquetas cae más que el PCA limpio. En la práctica los equipos de fraude usan los dos.</p></details>
+</section>
+
+<section class="panel" id="pre-s1">
+  <h2>Los ejercicios de los notebooks</h2>
+  <p>Cada notebook trae sus ejercicios con la solución completa al final. Intenta resolverlos antes de mirar.</p>
+  <div class="mwrap"><table class="tabla">
+    <tr><th>Notebook</th><th>Ejercicio</th></tr>
+    <tr><td>08 Fraude con PCA</td><td><b>El reloj como variable.</b> Agregar <code>Time</code> y explicar, con la fórmula del error, por qué casi no cambia el resultado aunque testing tenga horas que training nunca vio.</td></tr>
+    <tr><td>08 Fraude con PCA</td><td><b>El umbral como decisión.</b> Recall, precision y costo total con percentiles 99 a 99,9, con revisiones de 5 euros y fraudes que cuestan su monto.</td></tr>
+    <tr><td>08 Fraude con PCA</td><td><b>¿Cuántas etiquetas valen lo mismo que el PCA?</b> Logística con 5 a 200 fraudes etiquetados contra el PCA limpio, con tres semillas.</td></tr>
+    <tr><td>09 Curva de tasas</td><td><b>La compensación inflacionaria.</b> PCA conjunto de las curvas en pesos y en UF: encontrar el factor que las mueve en sentidos opuestos.</td></tr>
+    <tr><td>09 Curva de tasas</td><td><b>Estandarizar o no, fuera de muestra.</b> Qué versión describe mejor los plazos largos.</td></tr>
+    <tr><td>09 Curva de tasas</td><td><b>El modelo frente a los huecos.</b> Aplicar las formas de 2008 a 2021 a las semanas completas desde 2023.</td></tr>
+    <tr><td>10 Autoencoder</td><td><b>El tamaño del cuello de botella.</b> Códigos de 8 y 15 números: por qué en detección de anomalías el cuello tiene que ser ancho.</td></tr>
+    <tr><td>10 Autoencoder</td><td><b>La contaminación, otra vez.</b> Entrenar el autoencoder con fraudes incluidos.</td></tr>
+    <tr><td>10 Autoencoder</td><td><b>Juntar los dos detectores.</b> Promedio de rangos del PCA y del autoencoder.</td></tr>
+  </table></div>
+</section>
+<div class="nav"><button type="button" id="pre-prev">Anterior</button><button type="button" id="pre-next">Siguiente</button></div>
+</div>
+</div>
